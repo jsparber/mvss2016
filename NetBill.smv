@@ -1,0 +1,125 @@
+------------------------
+-- MVSS Project       --
+-- Julian Sparber     --
+-- Matricola #260324  --
+------------------------
+
+--------------------------------------------------------------------------------
+-- Model Checking for an NetBill Security and Transaction Protocol            --
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Protocol specifications:                                                   --
+-- http://www.sti.uniurb.it/aldini/mvss/2016s2a.pdf                           --
+--------------------------------------------------------------------------------
+
+-------------
+-- Modules --
+-------------
+
+MODULE main
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+---------------------------
+-- Variables declaration --
+---------------------------
+
+VAR
+
+----------------------------------------
+-- Consumer, Merchant and Bank states --
+----------------------------------------
+-- State description:
+--
+-- gr   "Goods Request"
+-- eg   "Encrypted Goods"
+-- epo  "Electronic Payment Order"
+-- pn   "Payment Slip or No Payment"
+-- pnn  "Payment Slip or No Payment or No Record"
+-- te   "Transaction Enquiry"
+-- eepo "Endorsed EPO"
+
+c_state: {idle, gr, epo, te, complete, timeout};
+m_state: {idle, eg, eepo, pn, timeout};
+b_state: {idle, pn, pnn, timeout};
+c_timeout: {true, false};
+m_timeout: {true, false};
+b_timeout: {true, false};
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+-------------------------
+-- Variable assignment --
+-------------------------
+
+ASSIGN
+
+init(c_state) := idle;
+init(m_state) := idle;
+init(b_state) := idle;
+init(c_timeout) := false;
+init(m_timeout) := false;
+init(b_timeout) := false;
+
+--------------------
+-- Partner update --
+--------------------
+
+next(c_state) := 
+  case
+    c_state = idle : {idle, gr};
+    c_state = gr & m_state = eg : epo;
+    c_state = epo & m_state = pn : te;
+    c_state = te & b_state = pnn : complete;
+    TRUE          : c_state;
+  esac;
+
+next(m_state) := 
+  case
+    m_state = idle & c_state = gr : eg;
+    m_state = eg & c_state = epo : eepo;
+    m_state =  eepo & b_state = pn : pn;
+    m_state = pn & c_state = te : idle;
+    TRUE          : m_state;
+  esac;
+
+next(b_state) := 
+  case
+    b_state = idle & m_state = eepo : pn;
+    b_state = pn & c_state = te : pnn;
+    b_state = pnn & c_state = complete : idle;
+    TRUE          : b_state;
+  esac;
+
+next(c_timeout) :=
+  case
+    c_state = idle : false;
+  TRUE             : {true, false};
+  esac;
+
+next(m_timeout) :=
+  case
+    m_state = idle : false;
+  TRUE             : {true, false};
+  esac;
+
+next(b_timeout) :=
+  case
+    b_state = idle : false;
+  TRUE             : {true, false};
+  esac;
+
+
+------------------------------------------------------
+------------------------------------------------------
+
+-- Model Checking
+
+--we must be able to tell when the merchant “receives payment” and when the consumer “receives the goods”
+SPEC
+
+-- When this state is reacted means the transcation has been concluded
+AG !(c_state = complete & m_state = idle & b_state = idle);
