@@ -13,60 +13,53 @@
 -- http://www.sti.uniurb.it/aldini/mvss/2016s2a.pdf                           --
 --------------------------------------------------------------------------------
 
--------------
--- Modules --
--------------
+
+--------------------------------------------------------------------------------
+-- Modules                                                                    --
+--------------------------------------------------------------------------------
 
 MODULE main
 
 --------------------------------------------------------------------------------
+-- Variables declaration                                                      --
 --------------------------------------------------------------------------------
-
----------------------------
--- Variables declaration --
----------------------------
 
 VAR
 
-----------------------------------------
--- Consumer, Merchant and Bank states --
-----------------------------------------
+--------------------------------------------------------------------------------
+-- Consumer, Merchant and Bank states                                         --
+--------------------------------------------------------------------------------
+
 -- State description:
---
--- gr   "Goods Request"
--- eg   "Encrypted Goods"
--- epo  "Electronic Payment Order"
--- pn   "Payment Slip or No Payment"
--- pnn  "Payment Slip or No Payment or No Record"
--- te   "Transaction Enquiry"
--- eepo "Endorsed EPO"
+--  gr   "Goods Request"
+--  eg   "Encrypted Goods"
+--  epo  "Electronic Payment Order"
+--  pn   "Payment Slip or No Payment"
+--  pnn  "Payment Slip or No Payment or No Record"
+--  te   "Transaction Enquiry"
+--  eepo "Endorsed EPO"
 
-c_state: {idle, gr, epo, te, complete, timeout};
-m_state: {idle, eg, eepo, pn, timeout};
-b_state: {idle, pn, pnn, timeout};
-c_timeout: {true, false};
-m_timeout: {true, false};
-b_timeout: {true, false};
+c_state: {idle, gr, epo, te, complete};
+m_state: {idle, eg, eepo, pn};
+b_state: {idle, pn, pnn};
 
 --------------------------------------------------------------------------------
+-- Variable assignment                                                        --
 --------------------------------------------------------------------------------
-
--------------------------
--- Variable assignment --
--------------------------
 
 ASSIGN
 
 init(c_state) := idle;
 init(m_state) := idle;
 init(b_state) := idle;
-init(c_timeout) := false;
-init(m_timeout) := false;
-init(b_timeout) := false;
 
---------------------
--- Partner update --
---------------------
+--------------------------------------------------------------------------------
+-- Model definition                                                           --
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Consumer                                                                   --
+--------------------------------------------------------------------------------
 
 next(c_state) := 
   case
@@ -77,6 +70,10 @@ next(c_state) :=
     TRUE          : c_state;
   esac;
 
+--------------------------------------------------------------------------------
+-- Merchant                                                                   --
+--------------------------------------------------------------------------------
+
 next(m_state) := 
   case
     m_state = idle & c_state = gr : eg;
@@ -86,6 +83,10 @@ next(m_state) :=
     TRUE          : m_state;
   esac;
 
+--------------------------------------------------------------------------------
+-- Bank                                                                   --
+--------------------------------------------------------------------------------
+
 next(b_state) := 
   case
     b_state = idle & m_state = eepo : pn;
@@ -94,32 +95,11 @@ next(b_state) :=
     TRUE          : b_state;
   esac;
 
-next(c_timeout) :=
-  case
-    c_state = idle : false;
-  TRUE             : {true, false};
-  esac;
+--------------------------------------------------------------------------------
+-- Model Checking                                                             --
+--------------------------------------------------------------------------------
 
-next(m_timeout) :=
-  case
-    m_state = idle : false;
-  TRUE             : {true, false};
-  esac;
-
-next(b_timeout) :=
-  case
-    b_state = idle : false;
-  TRUE             : {true, false};
-  esac;
-
-
-------------------------------------------------------
-------------------------------------------------------
-
--- Model Checking
-
---we must be able to tell when the merchant “receives payment” and when the consumer “receives the goods”
 SPEC
 
--- When this state is reacted means the transcation has been concluded
+-- When this state is reached means the transcation has been concluded
 AG !(c_state = complete & m_state = idle & b_state = idle);
