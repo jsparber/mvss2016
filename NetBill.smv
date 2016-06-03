@@ -34,14 +34,17 @@ VAR
 --  gr   "Goods Request"
 --  eg   "Encrypted Goods"
 --  epo  "Electronic Payment Order"
---  pn   "Payment Slip or No Payment"
---  pnn  "Payment Slip or No Payment or No Record"
+--  pa   "Payment Slip"
+--  pa_c "Payment Slip (banke state after response to consumer)"
+--  pa_m "Payment Slip (banke state after response to merchant)"
+--  np   "No Payment"
+--  nr   "No Record"
 --  te   "Transaction Enquiry"
 --  eepo "Endorsed EPO"
 
-c_state: {idle, gr, epo, te, complete};
-m_state: {idle, eg, eepo, pn};
-b_state: {idle, pn, pnn};
+c_state: {idle, gr, epo, te, complete, error};
+m_state: {idle, eg, eepo, pa, no, error};
+b_state: {idle, pa_m, pa_c, np, nr, error};
 
 --------------------------------------------------------------------------------
 -- Variable assignment                                                        --
@@ -65,8 +68,9 @@ next(c_state) :=
   case
     c_state = idle : {idle, gr};
     c_state = gr & m_state = eg : epo;
-    c_state = epo & m_state = pn : te;
-    c_state = te & b_state = pnn : complete;
+    c_state = epo & m_state = pa : te;
+    c_state = te & b_state = pa_c : complete;
+    m_state = no | b_state = no | b_state = nr : error;
     TRUE          : c_state;
   esac;
 
@@ -78,8 +82,9 @@ next(m_state) :=
   case
     m_state = idle & c_state = gr : eg;
     m_state = eg & c_state = epo : eepo;
-    m_state =  eepo & b_state = pn : pn;
-    m_state = pn & c_state = te : idle;
+    m_state = eepo & b_state = pa_m : {pa, no};
+    m_state = pa & c_state = te : idle;
+    m_state = no | b_state = no : error;
     TRUE          : m_state;
   esac;
 
@@ -89,9 +94,10 @@ next(m_state) :=
 
 next(b_state) := 
   case
-    b_state = idle & m_state = eepo : pn;
-    b_state = pn & c_state = te : pnn;
-    b_state = pnn & c_state = complete : idle;
+    b_state = idle & m_state = eepo : {pa_m, np};
+    b_state = pa_m & c_state = te : {pa_c, np, nr};
+    b_state = pa_c & c_state = complete : idle;
+    m_state = no : error;
     TRUE          : b_state;
   esac;
 
@@ -103,3 +109,6 @@ SPEC
 
 -- When this state is reached means the transcation has been concluded
 AG !(c_state = complete & m_state = idle & b_state = idle);
+
+SPEC
+AG !(c_state = error | m_state = error | b_state = error);
