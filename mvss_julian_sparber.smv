@@ -13,6 +13,8 @@
 -- http://www.sti.uniurb.it/aldini/mvss/2016s2a.pdf                           --
 --------------------------------------------------------------------------------
 
+-- Verification of the communication 
+-- between the 3 entities in the NetBill Protocol
 
 --------------------------------------------------------------------------------
 -- Modules                                                                    --
@@ -30,20 +32,25 @@ VAR
 -- Consumer, Merchant and Bank states                                         --
 --------------------------------------------------------------------------------
 
--- State description:
+-- State and msg description:
 --  gr   "Goods Request"
 --  eg   "Encrypted Goods"
 --  epo  "Electronic Payment Order"
 --  pa   "Payment Slip"
---  pa_c "Payment Slip (banke state after response to consumer)"
---  pa_m "Payment Slip (banke state after response to merchant)"
+--  pa_c "Payment Slip (bank state after response to consumer)"
+--  pa_m "Payment Slip (bank state after response to merchant)"
 --  np   "No Payment"
 --  nr   "No Record"
 --  te   "Transaction Enquiry"
 --  eepo "Endorsed EPO"
 
+-- c_state contains the state of the consumer
 c_state: {idle, gr, epo, te, complete, error};
-m_state: {idle, eg, eepo, pa, no, error};
+
+-- m_state contains the state of the merchant
+m_state: {idle, eg, eepo, pa, np, error};
+
+-- b_state contains the state of the bank
 b_state: {idle, pa_m, pa_c, np, nr, error};
 
 --------------------------------------------------------------------------------
@@ -52,6 +59,8 @@ b_state: {idle, pa_m, pa_c, np, nr, error};
 
 ASSIGN
 
+-- At the beginning all entities start with the idle state
+
 init(c_state) := idle;
 init(m_state) := idle;
 init(b_state) := idle;
@@ -59,6 +68,9 @@ init(b_state) := idle;
 --------------------------------------------------------------------------------
 -- Model definition                                                           --
 --------------------------------------------------------------------------------
+
+-- When the entity sends a msg to a other entity 
+-- it changes his state to the sended msg
 
 --------------------------------------------------------------------------------
 -- Consumer                                                                   --
@@ -70,7 +82,8 @@ next(c_state) :=
     c_state = gr & m_state = eg : epo;
     c_state = epo & m_state = pa : te;
     c_state = te & b_state = pa_c : complete;
-    m_state = no | b_state = no | b_state = nr : error;
+    -- when the there is no paymant or no record the state is set to error 
+    m_state = np | b_state = np | b_state = nr : error;
     TRUE          : c_state;
   esac;
 
@@ -82,9 +95,10 @@ next(m_state) :=
   case
     m_state = idle & c_state = gr : eg;
     m_state = eg & c_state = epo : eepo;
-    m_state = eepo & b_state = pa_m : {pa, no};
+    m_state = eepo & b_state = pa_m : {pa, np};
     m_state = pa & c_state = te : idle;
-    m_state = no | b_state = no : error;
+    -- when the there is no paymant the state is set to error 
+    m_state = np | b_state = np : error;
     TRUE          : m_state;
   esac;
 
@@ -97,7 +111,8 @@ next(b_state) :=
     b_state = idle & m_state = eepo : {pa_m, np};
     b_state = pa_m & c_state = te : {pa_c, np, nr};
     b_state = pa_c & c_state = complete : idle;
-    m_state = no : error;
+    -- when the there is no paymant the state is set to error 
+    m_state = np : error;
     TRUE          : b_state;
   esac;
 
@@ -105,10 +120,13 @@ next(b_state) :=
 -- Model Checking                                                             --
 --------------------------------------------------------------------------------
 
+-- In at least one execution path, sooner or later it will be true,
+-- means that the transaction has been concluded
 SPEC
+EF (c_state = complete & m_state = idle & b_state = idle);
 
--- When this state is reached means the transcation has been concluded
-AG !(c_state = complete & m_state = idle & b_state = idle);
+-- In at least one execution path, it is always true,
+-- means at least on execution path excites whitout an error
 
 SPEC
-AG !(c_state = error | m_state = error | b_state = error);
+EG !(c_state = error | m_state = error | b_state = error);
