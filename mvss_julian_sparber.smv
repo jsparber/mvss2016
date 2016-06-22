@@ -121,12 +121,18 @@ next(b_state) :=
 --------------------------------------------------------------------------------
 
 -- In at least one execution path, sooner or later it will be true,
--- means that the transaction has been concluded
+-- means that the transaction has been concluded in at lest one execution path
 SPEC
-EF (c_state = complete & m_state = idle & b_state = idle);
+EF  (c_state = complete & m_state = idle & b_state = idle);
 
 -- In at least one execution path, it is always true,
 -- means at least on execution path excites whitout an error
 
 SPEC
 EG !(c_state = error | m_state = error | b_state = error);
+
+
+-- In all execution paths, sooner or later it will be true,
+-- means that all execution paths guarantee that the consumer doesn't recive the key to encrypt the goods unless he has paid, and that the consumer recives the key when he has paid.
+SPEC
+AF  (((c_state = complete | c_state = idle) & m_state = idle & b_state = idle) | (c_state = error | m_state = error | b_state = error));
